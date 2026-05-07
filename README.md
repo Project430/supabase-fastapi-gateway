@@ -110,11 +110,20 @@ docs/
 
 MIT. See `LICENSE`.
 
-## Field Test: Lightwheel (V1.2)
+## Field Test: Lightwheel (V1.1)
 
 - project name: Lightwheel
 - result: succeeded
-- approximate duration / passes: about 6 passes
+- approximate duration / runs: about 6 runs
 - what was improved in this repo after the test: shorter agent prompt, leaner intermediate output, lighter verification flow, fewer docs/comments
 - main friction discovered: repeated scans and verbose per-run summaries slowed `Next`-driven migration
 - why this repo update was needed: to make repeated migration runs faster, lower-token, and easier to continue
+
+## Field Test: Vodical Landing page (V1.2)
+
+- project name: Vodical Landing page
+- result: succeeded
+- approximate duration / runs: 1 run
+- what was improved in this repo after the test: stricter low-token migration prompt with safer Phase 0 cleanup, explicit no-op path, indirect-usage checks, adaptive verification, and stronger cleanup rules
+- main friction discovered: agents could miss hidden Supabase usage in shared helpers and could hesitate or over-scan on tiny/no-op migrations
+- why this repo update was needed: to make repeated Next runs faster, more consistent, and less likely to stop early with a false completion state

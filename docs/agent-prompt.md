@@ -13,12 +13,15 @@ Do Phases 0-4 in order. Stop only on a hard blocker.
 - Intermediate runs should be compact and practical.
 - Do not repeat long explanations, plans, or verification summaries.
 - Scan only when needed. Reuse prior inventory unless code changed.
+- Do not rescan the whole app if prior inventory is still valid.
+- Optional: keep one tiny migration-state note only if it clearly avoids repeated scanning.
 - Re-run gateway health checks only if gateway code changed.
 - Keep auth and realtime on `supabase-js`.
 - Migrate only data, functions, and storage calls.
 - Use explicit routes only: one route per resource or function.
 - No generic proxy routes.
 - Do not refactor unrelated code.
+- Do not edit the cloned template README or unrelated template docs during app migration.
 
 ## Phase 0 // Place files
 
@@ -27,7 +30,12 @@ Move:
 - `supabase-fastapi-gateway/frontend-example/api-client.ts` -> `./src/lib/api-client.ts`
 - `supabase-fastapi-gateway/docs/` -> `./docs/api-gateway/`
 
-Delete the empty `supabase-fastapi-gateway/` folder. If `./api-gateway/` already exists, ask before overwriting.
+If `./api-gateway/` already exists, ask before overwriting.
+
+After the required moves, inspect what is left in `supabase-fastapi-gateway/`:
+- if only template leftovers remain, such as `.git`, `README*`, `LICENSE*`, `.gitignore`, or similar template metadata, remove them and then remove the folder
+- do not delete anything that looks like user app code, user content, or anything you did not just clone from the template
+- if unsure whether a leftover is template-only, stop and ask once
 
 ## Phase 1 // Configure env
 
@@ -71,6 +79,7 @@ Rules:
 - If an area is centralized in a shared helper or hook, migrate it there.
 - Frontend response shape stays `{ data, error }`.
 - Do not weaken RLS or move secrets client-side.
+- Migration is not complete until both direct and indirect Supabase usage paths were checked.
 
 Scan for:
 - `supabase.functions.invoke(`
@@ -79,29 +88,45 @@ Scan for:
 - `/functions/v1/`
 - `/rest/v1/`
 - `/storage/v1/`
+- imports/usages of shared helpers or wrappers such as `supabaseClient`, `integrations/supabase/client`, shared hooks, services, helpers, or clients that may hide Supabase access
+
+If direct matches are sparse, inspect the shared helper layer before declaring the app done.
 
 Build inventory by area with:
 - kind: `data` | `functions` | `storage`
 - files
 - call count
+- note whether usage is direct or hidden behind a shared helper
+
+No-op path:
+- if the inventory confirms no direct or indirect frontend data/function/storage usage to migrate, still complete Phases 0, 1, 2, and 4
+- confirm the inventory is empty
+- finish cleanly without inventing migration work
 
 Per run:
 1. Pick a safe chunk from the inventory.
 2. Add route files under `api-gateway/app/routes/` and register them in `app/main.py`.
 3. Use `supabase_rest`, `supabase_functions`, and `supabase_storage`.
 4. Authenticated routes must use `Depends(get_bearer_token)`.
-5. User-scoped routes must read user id from the bearer token, not the body.
-6. Update frontend call sites through `src/lib/api-client.ts`.
-7. Run only minimal checks for the changed chunk.
+5. Public routes may allow anon access; if a bearer token is present and useful, it may still be forwarded upstream.
+6. User-scoped routes must read user id from the bearer token, not the body.
+7. Route shape: collection read `GET /v1/posts`; single resource read `GET /v1/posts/{slug}`; use named action routes only when truly function-like; user-scoped read/write routes require bearer token and user id from token.
+8. Update frontend call sites through `src/lib/api-client.ts`.
+9. Remove obsolete frontend Supabase helper/wrapper files only when they are no longer used and safe to delete.
+10. Run only minimal checks for the changed chunk.
 
 Intermediate verification:
-- confirm changed files still typecheck or lint if that project already has those commands
+- prefer existing project build/typecheck/lint commands over inventing new checks
+- `build` is often a better final lightweight confidence check than noisy lint
+- confirm changed files still pass the lightest relevant existing check
 - confirm migrated calls no longer hit direct Supabase URLs
+- if gateway startup fails specifically because of `--reload` watcher or environment permission issues, retry without `--reload`
 - do not print long verification notes
 
 When all migration work is complete:
 - run the stronger final verification pass
 - re-scan once to confirm no remaining direct data/function/storage calls
+- confirm shared helpers/wrappers/hooks no longer hide remaining Supabase data/function/storage usage
 - run the broader health checks
 - say migration is complete
 
