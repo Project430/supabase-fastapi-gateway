@@ -4,7 +4,7 @@ Run at the root of the user's app. The template was cloned to `./supabase-fastap
 
 Goal: migrate React + Supabase apps to the FastAPI gateway with low token usage and fast repeated `Next` runs. Correctness matters more than commentary.
 
-Do Phases 0-4 in order. Stop only on a hard blocker.
+Do Phases 0-5 in order. Stop only on a hard blocker.
 
 ## Working style
 
@@ -22,6 +22,7 @@ Do Phases 0-4 in order. Stop only on a hard blocker.
 - No generic proxy routes.
 - Do not refactor unrelated code.
 - Do not edit the cloned template README or unrelated template docs during app migration.
+- Do production deployment readiness only after the migration is complete and working locally.
 
 ## Phase 0 // Place files
 
@@ -34,6 +35,7 @@ If `./api-gateway/` already exists, ask before overwriting.
 
 After the required moves, inspect what is left in `supabase-fastapi-gateway/`:
 - if only template leftovers remain, such as `.git`, `README*`, `LICENSE*`, `.gitignore`, or similar template metadata, remove them and then remove the folder
+- also remove starter-only example folders or files that are no longer needed after the required moves, but only if they clearly came from the template
 - do not delete anything that looks like user app code, user content, or anything you did not just clone from the template
 - if unsure whether a leftover is template-only, stop and ask once
 
@@ -46,6 +48,15 @@ cd api-gateway && cp .env.example .env
 Fill from existing app env files:
 - `SUPABASE_URL` or `VITE_SUPABASE_URL`
 - `SUPABASE_ANON_KEY` or `VITE_SUPABASE_ANON_KEY` or `SUPABASE_PUBLISHABLE_KEY`
+
+Detect the frontend dev origin the app is actually using before filling `FRONTEND_ORIGIN`:
+- check existing app env files, package scripts, Vite config, Next config, Docker/devcontainer config, or other local dev config
+- do not assume `http://localhost:5173` or any other default port
+- use the real frontend dev origin if it is discoverable, such as `http://localhost:8080`
+- if the configured origin appears wrong for the current app, update it or clearly tell the user what to change
+- do not force the user to change how the frontend is started just to match the gateway
+
+Then fill:
 - `FRONTEND_ORIGIN`
 
 Add frontend API URL with the app's env prefix:
@@ -54,7 +65,7 @@ Add frontend API URL with the app's env prefix:
 VITE_API_URL=http://localhost:8000
 ```
 
-If a value is still missing after one search, ask once. Never put `service_role` in the frontend.
+If a value is still missing after one focused search, ask once. Never put `service_role` in the frontend.
 
 ## Phase 2 // Verify gateway
 
@@ -128,6 +139,9 @@ When all migration work is complete:
 - re-scan once to confirm no remaining direct data/function/storage calls
 - confirm shared helpers/wrappers/hooks no longer hide remaining Supabase data/function/storage usage
 - run the broader health checks
+- remove template-only leftovers that are no longer needed after migration, including starter markdown files, example folders, and temporary documentation assets that came from the template and are no longer useful in the migrated app
+- examples of removable template-only leftovers may include `docs/agent-prompt.md`, `docs/assets/Exemple-api-doc.png`, unused starter example folders, and other template guidance files or images that were only meant to bootstrap the migration
+- do not delete docs, markdown files, or examples that the user appears to have edited, adopted, or kept for real project use
 - say migration is complete
 
 ## Per-run final output
@@ -147,10 +161,15 @@ remaining:
 - storage: <N files> // <short labels>
 
 estimated runs left: <N>
-Type "Next" to continue.
+<one closing line chosen by state>
 ```
 
 Use plain-English area labels only. If a category is done, write `0 files // none`.
+
+Closing line rules:
+- if migration work is still left, write `Type "Next" to continue.`
+- if the listed migration work is done but a broader repo scan is the logical next step, write `next step: run a wider scan for any remaining direct Supabase usage`
+- if everything has been checked, template-only leftovers have been cleaned up, and there is truly nothing left to migrate, write `all done, you can commit`
 
 Final complete run:
 
@@ -166,6 +185,7 @@ remaining:
 - storage: 0 files // none
 
 estimated runs left: 0
+all done, you can commit
 ```
 
 ## Phase 4 // Leave a rules file
@@ -191,3 +211,35 @@ Then add to repo-root `CLAUDE.md` and/or `AGENTS.md`:
 ```text
 Before adding any feature that touches Supabase, read docs/api-gateway/AGENTS.md.
 ```
+
+## Phase 5 // Production deployment readiness
+
+When the local migration is complete and working, prepare the gateway for production deployment.
+
+First detect the intended host:
+- `Vercel`
+- `VPS / Docker / Nginx`
+- `Railway`
+- `Fly.io`
+- `AWS`
+- `unknown`
+
+Do not assume the same setup for every project.
+If the host is not clear from the repo or deployment config, ask the user what he is using before setting up deployment files.
+
+If using `Vercel`:
+- create or verify a Vercel-compatible FastAPI entrypoint
+- use `api-gateway` as the API project Root Directory
+- add `vercel.json` only if required
+- ensure `/health` works publicly
+- ensure production rewrites do not expose docs directly
+
+Production security:
+- never expose `/docs`, `/redoc`, or `/openapi.json` publicly
+- keep docs available locally only
+- use `ENVIRONMENT=production` to disable public docs
+
+Deployment guidance:
+- recommend a separate deployment project for the API gateway
+- explain branch tracking if the user is deploying from a migration branch
+- ask the user if he needs guidance for this setup part

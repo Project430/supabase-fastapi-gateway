@@ -8,7 +8,7 @@ from app.routes.storage import router as storage_router
 
 settings = get_settings()
 
-app = FastAPI(title="supabase-fastapi-gateway", version="0.1.0")
+app = FastAPI(title="supabase-fastapi-gateway", version="0.2.0")
 
 app.add_middleware(
     CORSMiddleware,

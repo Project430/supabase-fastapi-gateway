@@ -85,9 +85,64 @@ Read supabase-fastapi-gateway/docs/agent-prompt.md and follow it end to end.
 The agent will place the files where they belong, wire up the Supabase environment variables, run the gateway locally, and migrate your Supabase calls one safe domain at a time.
 
 
-## Security
+## 4. Production Deployment
 
-Read `docs/security-notes.md` before production. The short version: this template is a controlled boundary, not a magic shield. Direct frontend-to-Supabase access with the anon/publishable key is fine when RLS is correctly configured // the things that actually bite are weak RLS, leaking the `service_role` key, and missing rate limiting / logging discipline. 
+After your AI coding agent finishes the local migration, deploy the gateway to a public API URL.
+
+Recommended production setup:
+
+```text
+frontend project  ->  https://yourdomain.com
+API project       ->  https://api.yourdomain.com
+
+
+Use a separate deployment project for the API gateway, even if it uses the same GitHub repo.
+
+Recommended:
+
+frontend project root: ./
+API project root: api-gateway
+
+This keeps frontend deploys, API deploys, logs, and environment variables separated.
+
+Vercel example : 
+
+Create a new Vercel project from the same GitHub repository.
+
+Use:
+
+- Framework Preset: Other
+- Root Directory: api-gateway
+- Build Command: empty
+- Output Directory: empty
+- Install Command: empty
+
+Add these environment variables:
+
+- SUPABASE_URL=...
+- SUPABASE_ANON_KEY=...
+- FRONTEND_ORIGIN=https://yourdomain.com
+- ENVIRONMENT=production
+
+Then set your frontend environment variable (on you main vercel project):
+
+VITE_API_URL=https://api.yourdomain.com
+
+Redeploy the frontend after changing VITE_API_URL.
+
+Point your API subdomain to your deployment provider.
+
+By default, your api documentation will not be publicly accessible in production.
+Local API docs are available at:
+
+http://localhost:xxxx/docs
+
+/docs
+/redoc
+/openapi.json
+
+Deploying on Vercel is simple for small gateways. A VPS is better if you need Docker, Nginx, long-running jobs, custom monitoring, or more backend control.
+
 
 ## Repo layout
 
@@ -124,6 +179,15 @@ MIT. See `LICENSE`.
 - project name: Vodical Landing page
 - result: succeeded
 - approximate duration / runs: 1 run
-- what was improved in this repo after the test: stricter low-token migration prompt with safer Phase 0 cleanup, explicit no-op path, indirect-usage checks, adaptive verification, and stronger cleanup rules
-- main friction discovered: agents could miss hidden Supabase usage in shared helpers and could hesitate or over-scan on tiny/no-op migrations
+- what was improved in this repo after the test: stricter low-token migration prompt with safer Phase 0 cleanup, explicit no-op path, indirect-usage checks, adaptive verification, and stronger cleanup rules main friction discovered: agents could miss hidden Supabase usage in shared helpers and could hesitate or over-scan on tiny/no-op migrations
 - why this repo update was needed: to make repeated Next runs faster, more consistent, and less likely to stop early with a false completion state
+
+## Field test: Deployment in production (V2.0)
+
+- project name: Lightwheel
+- result: after a successful migration locally in v1.1, the project successfully deployed in production. 
+- what was improved in this repo after the test: GitHub-reported issues are fixed, the deployment guidance
+- main friction discovered: the repo needed clearer production deployment guidance
+- why this repo update was needed: improve deployment instructions so future migrations are easier to ship without extra trial and error
+
+<img src="docs/assets/Exemple-api-doc.png" width="900" alt="API example documentation" />
