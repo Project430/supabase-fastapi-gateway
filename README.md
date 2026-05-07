@@ -109,3 +109,12 @@ docs/
 ## License
 
 MIT. See `LICENSE`.
+
+## Field Test: Lightwheel (V1.2)
+
+- project name: Lightwheel
+- result: succeeded
+- approximate duration / passes: about 6 passes
+- what was improved in this repo after the test: shorter agent prompt, leaner intermediate output, lighter verification flow, fewer docs/comments
+- main friction discovered: repeated scans and verbose per-run summaries slowed `Next`-driven migration
+- why this repo update was needed: to make repeated migration runs faster, lower-token, and easier to continue

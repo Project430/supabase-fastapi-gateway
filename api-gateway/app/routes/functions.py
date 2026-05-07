@@ -1,12 +1,4 @@
-"""Edge Function example.
-
-This is intentionally **one explicit route per Edge Function** (here:
-`example-function`). Do not refactor this into a generic
-`POST /v1/functions/{name}` route: that turns the gateway into an open
-proxy and undoes most of the security and audit benefits of having a
-gateway in the first place. Add one route per function you want to
-expose, and review each one.
-"""
+"""One explicit route per Edge Function."""
 
 from typing import Any
 
@@ -37,11 +29,6 @@ async def call_example_function(
     token: str = Depends(get_bearer_token),
     settings: Settings = Depends(get_settings),
 ) -> Any:
-    """Forward to the Supabase Edge Function named `example-function`.
-
-    The user's bearer token is forwarded so the Edge Function sees the
-    authenticated user via `auth.uid()` if it relies on RLS or `getUser()`.
-    """
     try:
         result = await invoke_supabase_function(
             settings=settings,

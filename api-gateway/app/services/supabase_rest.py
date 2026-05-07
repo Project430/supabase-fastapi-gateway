@@ -1,8 +1,4 @@
-"""Thin client for Supabase's PostgREST endpoint (`/rest/v1/<table>`).
-
-The gateway forwards the user's bearer token, so PostgREST applies the same
-Row Level Security policies it would if the browser called Supabase directly.
-"""
+"""Thin PostgREST client."""
 
 from typing import Any
 

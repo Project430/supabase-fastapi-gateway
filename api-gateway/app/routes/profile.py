@@ -1,9 +1,4 @@
-"""User profile resource.
-
-Demonstrates a typical CRUD-on-one-row pattern: every query is scoped to the
-caller's user id, which we read from their bearer token. We never accept a
-user id from the client.
-"""
+"""User-scoped profile routes."""
 
 from typing import Any
 

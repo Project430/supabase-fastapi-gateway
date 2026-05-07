@@ -1,9 +1,4 @@
-"""Streaming proxy for public Supabase Storage objects.
-
-Only public buckets are exposed here. Private buckets need signed URLs and a
-different code path that you should design explicitly: do not generalize this
-helper to "any object" without thinking about authorization.
-"""
+"""Streaming helper for public storage objects."""
 
 from typing import AsyncIterator
 
@@ -25,11 +20,6 @@ async def open_public_object_stream(
     bucket: str,
     path: str,
 ) -> tuple[AsyncIterator[bytes], dict[str, str]]:
-    """Return an async byte iterator for a public storage object plus a small
-    set of forwarded headers (content-type, content-length, cache-control,
-    etag). The iterator owns the underlying httpx client and closes it in its
-    `finally` block, so the caller just consumes it.
-    """
     headers = {"apikey": settings.supabase_anon_key}
     url = settings.storage_public_url(bucket, path)
     timeout = httpx.Timeout(60.0, connect=10.0)

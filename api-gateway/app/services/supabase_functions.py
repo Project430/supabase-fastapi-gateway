@@ -1,4 +1,4 @@
-"""Thin client for Supabase Edge Functions (`/functions/v1/<name>`)."""
+"""Thin Edge Function client."""
 
 from typing import Any
 

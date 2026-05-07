@@ -1,31 +1,33 @@
 # Agent Migration Prompt
 
-Run at the root of the user's app. The template was just cloned to `./supabase-fastapi-gateway/`.
+Run at the root of the user's app. The template was cloned to `./supabase-fastapi-gateway/`.
 
-Execute Phases 0–4 in order. Stop only on a hard blocker.
+Goal: migrate React + Supabase apps to the FastAPI gateway with low token usage and fast repeated `Next` runs. Correctness matters more than commentary.
 
----
+Do Phases 0-4 in order. Stop only on a hard blocker.
 
-## How to work
+## Working style
 
-- Be terse. No step-by-step narration between tool calls, no "I'm going to…" / "Now I'm…" updates. Run the work, then report results once at the end.
-- Don't add explanatory comments to migrated code. The route name and the typed client function are the documentation.
-- Don't refactor, rename, or "tidy" anything outside the migration scope.
-- Batch tool calls when they're independent (scans, reads, file moves).
-- One full-repo scan in Phase 3, not one scan per domain.
-
----
+- Keep output short.
+- The user will usually just type `Next`.
+- Intermediate runs should be compact and practical.
+- Do not repeat long explanations, plans, or verification summaries.
+- Scan only when needed. Reuse prior inventory unless code changed.
+- Re-run gateway health checks only if gateway code changed.
+- Keep auth and realtime on `supabase-js`.
+- Migrate only data, functions, and storage calls.
+- Use explicit routes only: one route per resource or function.
+- No generic proxy routes.
+- Do not refactor unrelated code.
 
 ## Phase 0 // Place files
 
 Move:
-- `supabase-fastapi-gateway/api-gateway/` → `./api-gateway/`
-- `supabase-fastapi-gateway/frontend-example/api-client.ts` → `./src/lib/api-client.ts`
-- `supabase-fastapi-gateway/docs/` → `./docs/api-gateway/`
+- `supabase-fastapi-gateway/api-gateway/` -> `./api-gateway/`
+- `supabase-fastapi-gateway/frontend-example/api-client.ts` -> `./src/lib/api-client.ts`
+- `supabase-fastapi-gateway/docs/` -> `./docs/api-gateway/`
 
 Delete the empty `supabase-fastapi-gateway/` folder. If `./api-gateway/` already exists, ask before overwriting.
-
----
 
 ## Phase 1 // Configure env
 
@@ -33,87 +35,115 @@ Delete the empty `supabase-fastapi-gateway/` folder. If `./api-gateway/` already
 cd api-gateway && cp .env.example .env
 ```
 
-Fill from existing app env files (search once each):
-- `SUPABASE_URL` // also `VITE_SUPABASE_URL`
-- `SUPABASE_ANON_KEY` // also `VITE_SUPABASE_ANON_KEY`, `SUPABASE_PUBLISHABLE_KEY`
-- `FRONTEND_ORIGIN` // Vite: `http://localhost:5173`, Next.js: `http://localhost:3000`
+Fill from existing app env files:
+- `SUPABASE_URL` or `VITE_SUPABASE_URL`
+- `SUPABASE_ANON_KEY` or `VITE_SUPABASE_ANON_KEY` or `SUPABASE_PUBLISHABLE_KEY`
+- `FRONTEND_ORIGIN`
 
-In the frontend env file (use the framework's prefix // `VITE_`, `NEXT_PUBLIC_`, `REACT_APP_`), add:
-```
+Add frontend API URL with the app's env prefix:
+
+```text
 VITE_API_URL=http://localhost:8000
 ```
 
-If a value is missing after one search, ask the user once. Never put `service_role` in the frontend.
+If a value is still missing after one search, ask once. Never put `service_role` in the frontend.
 
----
+## Phase 2 // Verify gateway
 
-## Phase 2 // Verify gateway (once per session)
+Run once per session, or again only if gateway code changed:
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt && uvicorn app.main:app --reload --port 8000
 ```
 
-Confirm `GET http://127.0.0.1:8000/api` returns `{"status":"ok"}`. Skip this phase on subsequent runs if the gateway is unchanged.
+Confirm:
 
----
+```text
+GET http://127.0.0.1:8000/api -> {"status":"ok"}
+```
 
 ## Phase 3 // Migrate
 
-**Rules:**
-- Keep Auth and Realtime on `supabase-js`. Move only data/function/storage calls.
-- Every migrated call uses an explicit named route. No generic proxies.
+Rules:
+- One inventory-based scan of `src/` when needed.
+- Migrate a meaningful chunk each run.
+- Small related areas can be batched together.
+- If an area is centralized in a shared helper or hook, migrate it there.
 - Frontend response shape stays `{ data, error }`.
-- Don't weaken RLS, move secrets to the frontend, or refactor unrelated files.
-- If a domain is centralized in a shared hook/helper, migrate there // not in every component.
+- Do not weaken RLS or move secrets client-side.
 
-**Workflow:**
+Scan for:
+- `supabase.functions.invoke(`
+- `supabase.from(`
+- `supabase.storage.`
+- `/functions/v1/`
+- `/rest/v1/`
+- `/storage/v1/`
 
-1. **Scan `src/` once, end to end** for all of:
-   - `supabase.functions.invoke(`
-   - `supabase.from(`
-   - `supabase.storage.`
-   - `/functions/v1/`, `/rest/v1/`, `/storage/v1/`
+Build inventory by area with:
+- kind: `data` | `functions` | `storage`
+- files
+- call count
 
-   Group every hit into domains (a domain = one product area, e.g. all profile calls, all the calls behind one feature). Build an inventory: `{ domain → { kind: data|functions|storage, files: […], call_count: N } }`. This inventory drives the rest of the phase and the final report.
+Per run:
+1. Pick a safe chunk from the inventory.
+2. Add route files under `api-gateway/app/routes/` and register them in `app/main.py`.
+3. Use `supabase_rest`, `supabase_functions`, and `supabase_storage`.
+4. Authenticated routes must use `Depends(get_bearer_token)`.
+5. User-scoped routes must read user id from the bearer token, not the body.
+6. Update frontend call sites through `src/lib/api-client.ts`.
+7. Run only minimal checks for the changed chunk.
 
-2. **Migrate a meaningful chunk in one run.** Pick 2–4 related low-risk domains from the inventory and migrate them together. Skip: auth, billing, admin, file-heavy flows, anything with cross-cutting RLS implications. A "chunk" is finished when every call in those domains goes through the gateway.
+Intermediate verification:
+- confirm changed files still typecheck or lint if that project already has those commands
+- confirm migrated calls no longer hit direct Supabase URLs
+- do not print long verification notes
 
-   Tiny domains (1 file, 1 call) should never be migrated alone // fold them into a chunk with related work.
+When all migration work is complete:
+- run the stronger final verification pass
+- re-scan once to confirm no remaining direct data/function/storage calls
+- run the broader health checks
+- say migration is complete
 
-3. **Implement (per domain in the chunk):**
-   - Add route(s) under `api-gateway/app/routes/`, register in `app/main.py`.
-   - Use helpers: `supabase_rest`, `supabase_functions`, `supabase_storage`.
-   - Authenticated routes: `Depends(get_bearer_token)`; user id from `get_user_id_from_token`, never from the body.
-   - Resource-style paths (e.g. `POST /v1/<resource>`).
-   - Update only that domain's frontend calls through `src/lib/api-client.ts`.
-   - No new code comments.
+## Per-run final output
 
-4. **Verify (once, at end of chunk):**
-   - Typecheck passes.
-   - Migrated calls no longer hit `*.supabase.co`.
-   - Lint changed files; full lint once at end of session.
+Intermediate runs:
 
-**Final output (this exact format, replacing the inventory with the user's actual one):**
+```text
+<one short sentence saying what was done.>
 
-```
 migrated this run:
-- <domain> (<kind>, <N> calls across <M> files)
-- <domain> (<kind>, <N> calls across <M> files)
+- <area label>
+- <area label>
 
 remaining:
-- data:      <N domains> / <M files>  // <short list of domain names>
-- functions: <N domains> / <M files>  // <short list of domain names>
-- storage:   <N domains> / <M files>  // <short list of domain names>
+- data: <N files> // <short labels>
+- functions: <N files> // <short labels>
+- storage: <N files> // <short labels>
 
-kept on supabase-js: auth, realtime[, …]
-estimated runs left: <N>  (assume 2–4 domains per run)
+estimated runs left: <N>
+Type "Next" to continue.
 ```
 
-If `remaining` is empty in a kind, write `none`. The remaining block is what the user reads to see how close the migration is to done // group, don't enumerate every file.
+Use plain-English area labels only. If a category is done, write `0 files // none`.
 
----
+Final complete run:
 
-## Phase 4 // Leave a rules file for future agents
+```text
+Migration is complete.
+
+migrated this run:
+- <area label>
+
+remaining:
+- data: 0 files // none
+- functions: 0 files // none
+- storage: 0 files // none
+
+estimated runs left: 0
+```
+
+## Phase 4 // Leave a rules file
 
 Create `docs/api-gateway/AGENTS.md` with:
 
@@ -122,21 +152,17 @@ Create `docs/api-gateway/AGENTS.md` with:
 
 Frontend talks to a FastAPI gateway in front of Supabase for data, functions, and storage.
 
-- No new Supabase Edge Functions // add a route under `api-gateway/app/routes/`.
+- No new Supabase Edge Functions; add a route under `api-gateway/app/routes/`.
 - No direct `supabase.from(...)`, `supabase.functions.invoke(...)`, or `supabase.storage.*` in frontend code.
-- Always go through `src/lib/api-client.ts`. If a call doesn't exist, add the gateway route first.
+- Always go through `src/lib/api-client.ts`.
 - Auth and Realtime stay on `supabase-js`.
-- Resource-style routes only (e.g. `/v1/profile`).
+- Resource-style routes only.
 - `service_role` never enters the frontend.
 - User-scoped routes read user id from the bearer token, never from the body.
-
-Add-feature flow: add route → register in `app/main.py` → add typed function in `api-client.ts` → call from frontend.
-
-If direct Supabase data/function/storage calls appear in the frontend, migrate them.
 ```
 
-Then add to repo-root `CLAUDE.md` and/or `AGENTS.md` (create a root `AGENTS.md` if neither exists):
+Then add to repo-root `CLAUDE.md` and/or `AGENTS.md`:
 
-> Before adding any feature that touches Supabase, read `docs/api-gateway/AGENTS.md`.
-
-Don't duplicate the ruleset across files.
+```text
+Before adding any feature that touches Supabase, read docs/api-gateway/AGENTS.md.
+```

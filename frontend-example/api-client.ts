@@ -1,25 +1,4 @@
-/**
- * Minimal TypeScript client for the FastAPI gateway.
- *
- * The response shape `{ data, error }` mirrors `supabase-js`, so migrating
- * call sites is mostly a matter of swapping the call function and removing
- * the `body:` wrapper.
- *
- * Usage (in a Vite / React app that already uses supabase-js for Auth):
- *
- *   import { supabase } from "@/integrations/supabase/client";
- *   import { createApiClient } from "@/lib/api-client";
- *
- *   const api = createApiClient({
- *     baseUrl: import.meta.env.VITE_API_URL,
- *     getAccessToken: async () => {
- *       const { data } = await supabase.auth.getSession();
- *       return data.session?.access_token ?? null;
- *     },
- *   });
- *
- *   const { data, error } = await api.get<Profile>("/v1/profile");
- */
+/** Minimal gateway client with `{ data, error }` responses. */
 
 export interface ApiError {
   message: string;

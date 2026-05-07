@@ -1,10 +1,4 @@
-"""Public storage object passthrough.
-
-Streams a file out of a single, allow-listed public bucket. Path traversal is
-blocked: `..` is rejected. If you need private buckets or per-user files, do
-not extend this route // write a new one that issues a Supabase signed URL
-after checking the caller's permissions.
-"""
+"""Public storage passthrough."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
